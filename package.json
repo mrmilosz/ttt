@@ -1,0 +1,20 @@
+{
+  "name": "ttt",
+  "version": "0.1.0",
+  "description": "Talk to Transformer reborn",
+  "main": "server.js",
+  "scripts": {
+    "start": "npx nodemon server.js"
+  },
+  "author": "mrmilosz",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.16.3",
+    "pug": "^2.0.3",
+    "websocket": "^1.0.31",
+    "winston": "^3.3.3"
+  },
+  "devDependencies": {
+    "nodemon": "^1.19.0"
+  }
+}

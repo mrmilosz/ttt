@@ -1,0 +1,36 @@
+html,
+body {
+  padding: 0;
+  border: none;
+  margin: 0;
+}
+
+html {
+  font: 14px "Helvetica", sans-serif;
+}
+
+body {
+  font-size: 0;
+}
+
+.input {
+  font-size: 1rem;
+}
+
+.go {
+  font-size: 1rem;
+}
+
+.output {
+  font-size: 1rem;
+  white-space: pre-wrap;
+}
+
+.output .prompt {
+  font-weight: bold;
+}
+
+.error {
+  font-size: 1rem;
+  color: red;
+}

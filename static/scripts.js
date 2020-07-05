@@ -6,16 +6,29 @@ document.addEventListener('DOMContentLoaded', function() {
       this.completionNode = document.querySelector('.output .completion');
       this.errorNode = document.querySelector('.error');
       this.goNode = document.querySelector('.go');
+      this.moreNode = document.querySelector('.more');
     }
 
     read() {
       const promptText = this.inputNode.value;
-      this.inputNode.disabled = true;
       this.promptNode.textContent = promptText;
       this.completionNode.textContent = '';
-      this.errorNode.textContent = '';
-      this.goNode.disabled = true;
+      this.block();
       return promptText;
+    }
+
+    getTail() {
+      const fullText = this.promptNode.textContent + this.completionNode.textContent;
+      const tailText = fullText.substring(Math.max(fullText.length - 1000, 0));
+      this.block();
+      return tailText;
+    }
+
+    block() {
+      this.inputNode.disabled = true;
+      this.goNode.disabled = true;
+      this.moreNode.classList.remove('visible');
+      this.errorNode.textContent = '';
     }
 
     appendOutput(text) {
@@ -30,12 +43,23 @@ document.addEventListener('DOMContentLoaded', function() {
       this.inputNode.disabled = false;
       this.inputNode.value = '';
       this.goNode.disabled = false;
+      this.moreNode.classList.add('visible');
     }
 
-    onGo(listener) {
+    onSubmit(listener) {
       this.goNode.addEventListener('click', () => {
         if (!this.goNode.disabled) {
-          listener(this.read(), this.appendOutput.bind(this), this.appendError.bind(this), this.done.bind(this));
+          listener({
+            promptText: this.read(),
+          }, this.appendOutput.bind(this), this.appendError.bind(this), this.done.bind(this));
+        }
+      });
+      this.moreNode.addEventListener('click', () => {
+        if (!this.goNode.disabled) {
+          listener({
+            promptText: this.getTail(),
+            isContinuation: true,
+          }, this.appendOutput.bind(this), this.appendError.bind(this), this.done.bind(this));
         }
       });
     }
@@ -43,31 +67,25 @@ document.addEventListener('DOMContentLoaded', function() {
 
   const utf8Decoder = new TextDecoder('utf-8');
 
-  ui.onGo(async (promptText, appendOutput, appendError, done) => {
-    console.log('awaiting response');
-    const response = await fetch('/generate', {
-      method: 'POST',
-      headers: {
-        'Content-type': 'application/json; charset=UTF-8',
-      },
-      body: JSON.stringify({
-        promptText: promptText,
-      }),
-    });
-    const reader = response.body.getReader();
+  ui.onSubmit((message, appendOutput, appendError, done) => {
+    const connection = new WebSocket(`wss://${window.location.host}`);
 
-    try {
-      console.log('awaiting read');
-      let { done, value } = await reader.read();
-      while (!done) {
-        appendOutput(utf8Decoder.decode(value));
-        ({ done, value } = await reader.read());
-      }
-    }
-    catch (error) {
-      appendError("Transformer did a fuckie wuckie!");
-      throw error;
-    }
-    done();
+    connection.onopen = () => {
+      connection.send(JSON.stringify(message));
+    };
+
+    connection.onerror = (error) => {
+      appendError(error);
+    };
+
+    connection.onmessage = (message) => {
+      appendOutput(message.data);
+    };
+
+    connection.onclose = () => {
+      done();
+    };
   });
+
+  
 });

@@ -11,6 +11,7 @@ html {
 
 body {
   font-size: 0;
+  margin: 1rem;
 }
 
 .input {
@@ -24,10 +25,19 @@ body {
 .output {
   font-size: 1rem;
   white-space: pre-wrap;
+  margin: 1rem 0;
 }
 
 .output .prompt {
   font-weight: bold;
+}
+
+.more {
+  font-size: 1rem;
+}
+
+.more:not(.visible) {
+  display: none;
 }
 
 .error {

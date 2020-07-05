@@ -1,5 +1,6 @@
 const express = require('express');
 const https = require('https');
+const websocket = require('websocket');
 const winston = require('winston');
 
 const colorizer = winston.format.colorize();
@@ -40,74 +41,89 @@ application.get('/', (request, response) => {
   });
 });
 
-application.post('/generate', (request, response) => {
-  const promptText = request.body.promptText;
-  logger.info("Prompt text: %s", promptText);
-  const data = JSON.stringify({
-    prompt: {
-      text: promptText,
-      isContinuation: false,
-    },
-    streamResponse: true,
-    length: 100,
-  });
-  const apiRequest = https.request({
-    hostname: 'api.inferkit.com',
-    path: '/v1/models/standard/generate',
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${process.env.INFERKIT_API_KEY}`,
-      'Content-Type': 'application/json',
-      'Content-Length': Buffer.byteLength(data),
-    }
-  }, (apiResponse) => {
-    logger.debug("Got response: %o", apiResponse);
-
-    response.setHeader('Content-Type', 'text/html; charset=utf-8'); // This is a lie, but it forces the browser to actually stream...
-    response.setHeader('Transfer-Encoding', 'chunked');
-    response.flushHeaders();
-
-    apiResponse.on('data', (rawChunk) => {
-      const textChunk = rawChunk.toString('utf-8');
-      let chunk = null;
-      try {
-        chunk = JSON.parse(textChunk).data
-      }
-      catch (error) {
-        logger.error(error);
-      }
-
-      if (chunk !== null) {
-        logger.info("Data parses to: %o", chunk);
-        if (chunk.text.length > 0) {
-          response.write(chunk.text);
-          response.flush();
-        }
-        if (chunk.isFinalChunk) {
-          response.end();
-        }
-      }
-      else {
-        logger.error("Could not parse chunk: %s", textChunk);
-      }
-    });
-    apiResponse.on('finish', () => {
-      response.end();
-    });
-    apiResponse.on('close', () => {
-      response.end();
-    });
-  });
-
-  apiRequest.on('error', (error) => {
-    logger.warn("Got error: %o", error);
-    response.send("Error");
-  });
-
-  apiRequest.write(data);
-  apiRequest.end();
-});
-
 logger.info("Starting server");
 
-const server = application.listen(8011);
+const server = new websocket.server({
+  httpServer: application.listen(8011),
+});
+
+server.on('request', (request) => {
+  const connection = request.accept(null, request.origin);
+  logger.info("Connection accepted");
+
+  connection.on('message', function({ utf8Data: rawData }) {
+    const data = JSON.parse(rawData);
+
+    const promptText = data.promptText;
+    const isContinuation = data.isContinuation || false;
+
+    logger.info("Prompt text: %s", promptText);
+    logger.info("Is continuation: %s", isContinuation);
+
+    const apiRequestData = JSON.stringify({
+      prompt: {
+        text: promptText,
+        isContinuation: isContinuation,
+      },
+      streamResponse: true,
+      length: 100,
+    });
+    const apiRequest = https.request({
+      hostname: 'api.inferkit.com',
+      path: '/v1/models/standard/generate',
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.INFERKIT_API_KEY}`,
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(apiRequestData),
+      }
+    }, (apiResponse) => {
+      logger.debug("Got response: %o", apiResponse);
+
+      apiResponse.on('data', (rawChunk) => {
+        const textChunk = rawChunk.toString('utf-8');
+        let chunk = null;
+        try {
+          chunk = JSON.parse(textChunk);
+        }
+        catch (error) {
+          logger.error(error);
+        }
+
+        if (chunk !== null) {
+          logger.info("Chunk received: %o", chunk);
+          if (chunk.data !== undefined) {
+            const data = chunk.data;
+            if (data.text.length > 0) {
+              connection.sendUTF(data.text);
+            }
+            if (data.isFinalChunk) {
+              connection.close();
+            }
+          }
+        }
+        else {
+          logger.error("Could not parse chunk: %s", textChunk);
+          connection.close();
+        }
+      });
+
+      apiResponse.on('finish', () => {
+        connection.close();
+      });
+
+      apiResponse.on('close', () => {
+        connection.close();
+      });
+    });
+
+    apiRequest.on('error', (error) => {
+      logger.warn("Got error: %o", error);
+      connection.close();
+    });
+
+    apiRequest.write(apiRequestData);
+    apiRequest.end();
+  });
+});
+

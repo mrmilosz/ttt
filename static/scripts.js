@@ -41,7 +41,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     done() {
       this.inputNode.disabled = false;
-      this.inputNode.value = '';
       this.goNode.disabled = false;
       this.moreNode.classList.add('visible');
     }

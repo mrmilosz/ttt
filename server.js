@@ -1,6 +1,9 @@
+const deepmerge = require('deepmerge');
 const express = require('express');
-const https = require('https');
+const fetch = require('node-fetch');
+const stream = require('stream');
 const websocket = require('websocket');
+const util = require('util');
 const winston = require('winston');
 
 const colorizer = winston.format.colorize();
@@ -48,82 +51,49 @@ const server = new websocket.server({
 });
 
 server.on('request', (request) => {
+  logger.info("Accepting client connection from %s", request.origin);
   const connection = request.accept(null, request.origin);
-  logger.info("Connection accepted");
 
-  connection.on('message', function({ utf8Data: rawData }) {
-    const data = JSON.parse(rawData);
+  connection.on('message', async ({ utf8Data: rawRequestData }) => {
+    try {
+      const apiRequestData = deepmerge({
+        prompt: {
+          text: " ",
+          isContinuation: false,
+        },
+        streamResponse: true,
+        length: 100,
+      }, JSON.parse(rawRequestData));
 
-    const promptText = data.promptText;
-    const isContinuation = data.isContinuation || false;
+      logger.info("Sending request data: %o", apiRequestData);
 
-    logger.info("Prompt text: %s", promptText);
-    logger.info("Is continuation: %s", isContinuation);
+      const apiResponse = await fetch('https://api.inferkit.com/v1/models/standard/generate', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.INFERKIT_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(apiRequestData)
+      });
 
-    const apiRequestData = JSON.stringify({
-      prompt: {
-        text: promptText,
-        isContinuation: isContinuation,
-      },
-      streamResponse: true,
-      length: 100,
-    });
-    const apiRequest = https.request({
-      hostname: 'api.inferkit.com',
-      path: '/v1/models/standard/generate',
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.INFERKIT_API_KEY}`,
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(apiRequestData),
-      }
-    }, (apiResponse) => {
-      logger.debug("Got response: %o", apiResponse);
-
-      apiResponse.on('data', (rawChunk) => {
-        const textChunk = rawChunk.toString('utf-8');
-        let chunk = null;
-        try {
-          chunk = JSON.parse(textChunk);
-        }
-        catch (error) {
-          logger.error(error);
-        }
-
-        if (chunk !== null) {
-          logger.info("Chunk received: %o", chunk);
-          if (chunk.data !== undefined) {
-            const data = chunk.data;
-            if (data.text.length > 0) {
-              connection.sendUTF(data.text);
-            }
-            if (data.isFinalChunk) {
-              connection.close();
-            }
+      for await (const rawLinesBytes of apiResponse.body) {
+        const rawLines = rawLinesBytes.toString('utf-8');
+        for (const rawLine of rawLines.split('\n')) {
+          if (rawLine.length > 0) {
+            const chunk = JSON.parse(rawLine).data;
+            logger.info("Received response chunk: %o", chunk);
+            connection.sendUTF(chunk.text);
           }
         }
-        else {
-          logger.error("Could not parse chunk: %s", textChunk);
-          connection.close();
-        }
-      });
-
-      apiResponse.on('finish', () => {
-        connection.close();
-      });
-
-      apiResponse.on('close', () => {
-        connection.close();
-      });
-    });
-
-    apiRequest.on('error', (error) => {
-      logger.warn("Got error: %o", error);
+      }
+    }
+    catch (error) {
+      logger.error(error);
+    }
+    finally {
+      logger.info("Closing client connection from %s", request.origin);
       connection.close();
-    });
-
-    apiRequest.write(apiRequestData);
-    apiRequest.end();
+    }
   });
 });
 

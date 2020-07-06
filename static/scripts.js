@@ -50,15 +50,19 @@ document.addEventListener('DOMContentLoaded', function() {
       this.goNode.addEventListener('click', () => {
         if (!this.goNode.disabled) {
           listener({
-            promptText: this.read(),
+            prompt: {
+              text: this.read(),
+            },
           }, this.appendOutput.bind(this), this.appendError.bind(this), this.done.bind(this));
         }
       });
       this.moreNode.addEventListener('click', () => {
         if (!this.goNode.disabled) {
           listener({
-            promptText: this.getTail(),
-            isContinuation: true,
+            prompt: {
+              text: this.getTail(),
+              isContinuation: true,
+            },
           }, this.appendOutput.bind(this), this.appendError.bind(this), this.done.bind(this));
         }
       });

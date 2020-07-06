@@ -78,17 +78,21 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 
     connection.onerror = (error) => {
-      appendError(error);
+      appendError("Client error");
     };
 
-    connection.onmessage = (message) => {
-      appendOutput(message.data);
+    connection.onmessage = ({ data: rawMessage }) => {
+      const message = JSON.parse(rawMessage);
+      if (message.error) {
+        appendError(message.error);
+      }
+      else {
+        appendOutput(message.text);
+      }
     };
 
     connection.onclose = () => {
       done();
     };
   });
-
-  
 });

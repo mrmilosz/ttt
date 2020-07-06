@@ -78,17 +78,21 @@ server.on('request', (request) => {
 
       for await (const rawLinesBytes of apiResponse.body) {
         const rawLines = rawLinesBytes.toString('utf-8');
+        logger.info("Received response part: %o", rawLines);
         for (const rawLine of rawLines.split('\n')) {
           if (rawLine.length > 0) {
             const chunk = JSON.parse(rawLine).data;
-            logger.info("Received response chunk: %o", chunk);
-            connection.sendUTF(chunk.text);
+            connection.sendUTF(JSON.stringify({
+              text: chunk.text,
+            }));
           }
         }
       }
     }
     catch (error) {
-      logger.error(error);
+      connection.sendUTF(JSON.stringify({
+        error: "Server error",
+      }));
     }
     finally {
       logger.info("Closing client connection from %s", request.origin);

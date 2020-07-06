@@ -32,6 +32,12 @@ if (!('INFERKIT_API_KEY' in process.env)) {
   });
 }
 
+if (!('ORIGIN' in process.env)) {
+  logger.error('Cannot continue without an origin.', () => {
+    process.exit(1);
+  });
+}
+
 application.set('view engine', 'pug');
 
 application.use(express.static(`${__dirname}/static`));
@@ -51,6 +57,9 @@ const server = new websocket.server({
 });
 
 server.on('request', (request) => {
+  if (request.origin !== process.env.ORIGIN) {
+    return;
+  }
   logger.info("Accepting client connection from %s", request.origin);
   const connection = request.accept(null, request.origin);
 

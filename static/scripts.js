@@ -60,8 +60,8 @@
     };
 
     bindSliderDisplay(lengthSliderNode, lengthNode, (value) => (10 * value).toString());
-    bindSliderDisplay(topPSliderNode, topPNode, (value) => Math.pow(10, ((value / 100) - .5) * 6).toFixed(3).substring(0, 5).replace(/\.$/, ''));
-    bindSliderDisplay(temperatureSliderNode, temperatureNode, (value) => (value / 100).toFixed(2));
+    bindSliderDisplay(topPSliderNode, topPNode, (value) => (value / 100).toFixed(2));
+    bindSliderDisplay(temperatureSliderNode, temperatureNode, (value) => Math.pow(10, 5 * value / 100 - 3).toFixed(3).substring(0, 5));
 
     goNode.addEventListener('click', () => {
       if (!goNode.disabled) {

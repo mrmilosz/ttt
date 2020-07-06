@@ -65,16 +65,7 @@ server.on('request', (request) => {
 
   connection.on('message', async ({ utf8Data: rawRequestData }) => {
     try {
-      const apiRequestData = deepmerge({
-        prompt: {
-          text: " ",
-          isContinuation: false,
-        },
-        streamResponse: true,
-        length: 100,
-      }, JSON.parse(rawRequestData));
-
-      logger.info("Sending request data: %o", apiRequestData);
+      logger.info("Sending request data: %s", rawRequestData);
 
       const apiResponse = await fetch('https://api.inferkit.com/v1/models/standard/generate', {
         method: 'POST',
@@ -82,7 +73,7 @@ server.on('request', (request) => {
           'Authorization': `Bearer ${process.env.INFERKIT_API_KEY}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(apiRequestData)
+        body: rawRequestData,
       });
 
       for await (const rawLinesBytes of apiResponse.body) {

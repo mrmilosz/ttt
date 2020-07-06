@@ -1,90 +1,123 @@
-document.addEventListener('DOMContentLoaded', function() {  
-  const ui = new class {
-    constructor() {
-      this.inputNode = document.querySelector('.input');
-      this.promptNode = document.querySelector('.output .prompt');
-      this.completionNode = document.querySelector('.output .completion');
-      this.errorNode = document.querySelector('.error');
-      this.goNode = document.querySelector('.go');
-      this.moreNode = document.querySelector('.more');
-    }
+(function() {
+  const start = (listener) => {
+    const inputNode = document.querySelector('.input');
+    const promptNode = document.querySelector('.output .prompt');
+    const completionNode = document.querySelector('.output .completion');
+    const errorNode = document.querySelector('.error');
+    const goNode = document.querySelector('.go');
+    const moreNode = document.querySelector('.more');
+    const lengthNode = document.querySelector('.length.display');
+    const topPNode = document.querySelector('.top-p.display');
+    const temperatureNode = document.querySelector('.temperature.display');
+    const lengthSliderNode = document.querySelector('.length-slider');
+    const topPSliderNode = document.querySelector('.top-p-slider');
+    const temperatureSliderNode = document.querySelector('.temperature-slider');
 
-    read() {
-      const promptText = this.inputNode.value;
-      this.promptNode.textContent = promptText;
-      this.completionNode.textContent = '';
-      this.block();
-      return promptText;
-    }
+    const getInput = () => {
+      return inputNode.value;
+    };
 
-    getTail() {
-      const fullText = this.promptNode.textContent + this.completionNode.textContent;
+    const beginOutput = (promptText) => {
+      promptNode.textContent = promptText;
+      completionNode.textContent = '';
+      errorNode.textContent = '';
+    };
+
+    const getTail = () => {
+      const fullText = promptNode.textContent + completionNode.textContent;
       const tailText = fullText.substring(Math.max(fullText.length - 1000, 0));
-      this.block();
       return tailText;
-    }
+    };
 
-    block() {
-      this.inputNode.disabled = true;
-      this.goNode.disabled = true;
-      this.moreNode.classList.remove('visible');
-      this.errorNode.textContent = '';
-    }
+    const block = () => {
+      inputNode.disabled = true;
+      goNode.disabled = true;
+      moreNode.classList.remove('visible');
+    };
 
-    appendOutput(text) {
-      this.completionNode.textContent += text;
-    }
+    const appendOutput = (text) => {
+      completionNode.textContent += text;
+    };
 
-    appendError(text) {
-      this.errorNode.textContent += text;
-    }
+    const appendError = (text) => {
+      errorNode.textContent += text;
+    };
 
-    done() {
-      this.inputNode.disabled = false;
-      this.goNode.disabled = false;
-      this.moreNode.classList.add('visible');
-    }
+    const done = (allowContinuation) => {
+      inputNode.disabled = false;
+      goNode.disabled = false;
+      if (allowContinuation && getTail().length > 0) {
+        moreNode.classList.add('visible');
+      }
+    };
 
-    onSubmit(listener) {
-      this.goNode.addEventListener('click', () => {
-        if (!this.goNode.disabled) {
-          listener({
-            prompt: {
-              text: this.read(),
-            },
-          }, this.appendOutput.bind(this), this.appendError.bind(this), this.done.bind(this));
+    const bindSliderDisplay = (sliderNode, displayNode, conversionFunction) => {
+      const displayValue = () => {
+        displayNode.textContent = conversionFunction(parseFloat(sliderNode.value));
+      }
+      displayValue();
+      sliderNode.addEventListener('input', displayValue);
+    };
+
+    bindSliderDisplay(lengthSliderNode, lengthNode, (value) => (10 * value).toString());
+    bindSliderDisplay(topPSliderNode, topPNode, (value) => Math.pow(10, ((value / 100) - .5) * 6).toFixed(3).substring(0, 5).replace(/\.$/, ''));
+    bindSliderDisplay(temperatureSliderNode, temperatureNode, (value) => (value / 100).toFixed(2));
+
+    goNode.addEventListener('click', () => {
+      if (!goNode.disabled) {
+        const generatorParameters = {
+          length: parseInt(lengthNode.textContent),
+          topP: parseFloat(topPNode.textContent),
+          temperature: parseFloat(temperatureNode.textContent),
+          streamResponse: true,
         }
-      });
-      this.moreNode.addEventListener('click', () => {
-        if (!this.goNode.disabled) {
-          listener({
-            prompt: {
-              text: this.getTail(),
-              isContinuation: true,
-            },
-          }, this.appendOutput.bind(this), this.appendError.bind(this), this.done.bind(this));
+        const text = getInput();
+        block();
+        beginOutput(text);
+        if (text.length > 0) {
+          generatorParameters.prompt = {
+            text: text,
+          };
         }
-      });
-    }
-  }();
+        listener(generatorParameters, appendOutput, appendError, done);
+      }
+    });
 
-  const utf8Decoder = new TextDecoder('utf-8');
+    moreNode.addEventListener('click', () => {
+      if (!goNode.disabled && !moreNode.disabled) {
+        const text = getTail();
+        block();
+        listener({
+          prompt: {
+            text: text,
+            isContinuation: true,
+          },
+          length: parseInt(lengthNode.textContent),
+          topP: parseFloat(topPNode.textContent),
+          temperature: parseFloat(temperatureNode.textContent),
+          streamResponse: true,
+        }, appendOutput, appendError, done);
+      }
+    });
+  };
 
-  ui.onSubmit((message, appendOutput, appendError, done) => {
+  document.addEventListener('DOMContentLoaded', start.bind(undefined, (generatorParameters, appendOutput, appendError, done) => {
     const connection = new WebSocket(`wss://${window.location.host}`);
 
     connection.onopen = () => {
-      connection.send(JSON.stringify(message));
+      connection.send(JSON.stringify(generatorParameters));
     };
 
     connection.onerror = (error) => {
       appendError("Client error");
+      done(false);
     };
 
     connection.onmessage = ({ data: rawMessage }) => {
       const message = JSON.parse(rawMessage);
       if (message.error) {
         appendError(message.error);
+        done(false);
       }
       else {
         appendOutput(message.text);
@@ -92,7 +125,7 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 
     connection.onclose = () => {
-      done();
+      done(true);
     };
-  });
-});
+  }));
+})();

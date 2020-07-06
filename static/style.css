@@ -29,6 +29,20 @@ button {
   height: 6rem;
 }
 
+.label {
+  font-size: 1rem;
+  margin-left: 1rem;
+}
+
+.display {
+  font-size: 1rem;
+  margin-right: 1rem;
+}
+
+.docs {
+  font-size: 1rem;
+}
+
 .go {
   font-size: 1rem;
 }

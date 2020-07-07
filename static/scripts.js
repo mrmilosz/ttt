@@ -29,6 +29,22 @@
       return tailText;
     };
 
+    const getLength = () => {
+      return parseInt(lengthNode.textContent);
+    };
+
+    const getTopP = () => {
+      return parseFloat(topPNode.textContent);
+    };
+
+    const getTemperature = () => {
+      return parseFloat(temperatureNode.textContent);
+    };
+
+    const blocked = () => {
+      return goNode.disabled;
+    };
+
     const block = () => {
       inputNode.disabled = true;
       goNode.disabled = true;
@@ -64,11 +80,11 @@
     bindSliderDisplay(temperatureSliderNode, temperatureNode, (value) => Math.pow(10, 5 * value / 100 - 3).toFixed(3).substring(0, 5));
 
     goNode.addEventListener('click', () => {
-      if (!goNode.disabled) {
+      if (!blocked()) {
         const generatorParameters = {
-          length: parseInt(lengthNode.textContent),
-          topP: parseFloat(topPNode.textContent),
-          temperature: parseFloat(temperatureNode.textContent),
+          length: getLength(),
+          topP: getTopP(),
+          temperature: getTemperature(),
           streamResponse: true,
         }
         const text = getInput();
@@ -84,7 +100,7 @@
     });
 
     moreNode.addEventListener('click', () => {
-      if (!goNode.disabled && !moreNode.disabled) {
+      if (!blocked()) {
         const text = getTail();
         block();
         listener({
@@ -92,9 +108,9 @@
             text: text,
             isContinuation: true,
           },
-          length: parseInt(lengthNode.textContent),
-          topP: parseFloat(topPNode.textContent),
-          temperature: parseFloat(temperatureNode.textContent),
+          length: getLength(),
+          topP: getTopP(),
+          temperature: getTemperature(),
           streamResponse: true,
         }, appendOutput, appendError, done);
       }

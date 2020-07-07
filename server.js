@@ -90,6 +90,7 @@ server.on('request', (request) => {
       }
     }
     catch (error) {
+      logger.error(error);
       connection.sendUTF(JSON.stringify({
         error: "Server error",
       }));

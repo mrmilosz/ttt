@@ -5,6 +5,7 @@
     const completionNode = document.querySelector('.output .completion');
     const errorNode = document.querySelector('.error');
     const goNode = document.querySelector('.go');
+    const dontNode = document.querySelector('.dont');
     const moreNode = document.querySelector('.more');
     const lengthNode = document.querySelector('.length.display');
     const topPNode = document.querySelector('.top-p.display');
@@ -13,14 +14,21 @@
     const topPSliderNode = document.querySelector('.top-p-slider');
     const temperatureSliderNode = document.querySelector('.temperature-slider');
 
+    let listenerHandle = null;
+
     const getInput = () => {
       return inputNode.value;
     };
 
-    const beginOutput = (promptText) => {
-      promptNode.textContent = promptText;
+    const clearOutput = () => {
+      promptNode.textContent = '';
       completionNode.textContent = '';
       errorNode.textContent = '';
+    };
+
+    const beginOutput = (promptText) => {
+      clearOutput();
+      promptNode.textContent = promptText;
     };
 
     const getTail = () => {
@@ -49,6 +57,7 @@
       inputNode.disabled = true;
       goNode.disabled = true;
       moreNode.classList.remove('visible');
+      dontNode.classList.add('visible');
     };
 
     const appendOutput = (text) => {
@@ -65,6 +74,8 @@
       if (allowContinuation && getTail().length > 0) {
         moreNode.classList.add('visible');
       }
+      dontNode.classList.remove('visible');
+      listenerHandle = null;
     };
 
     const bindSliderDisplay = (sliderNode, displayNode, conversionFunction) => {
@@ -95,15 +106,23 @@
             text: text,
           };
         }
-        listener(generatorParameters, appendOutput, appendError, done);
+        listenerHandle = listener(generatorParameters, appendOutput, appendError, done);
       }
+    });
+
+    dontNode.addEventListener('click', () => {
+      if (listenerHandle != null) {
+        listenerHandle.close();
+      }
+      clearOutput();
+      done();
     });
 
     moreNode.addEventListener('click', () => {
       if (!blocked()) {
         const text = getTail();
         block();
-        listener({
+        listenerHandle = listener({
           prompt: {
             text: text,
             isContinuation: true,
@@ -142,6 +161,12 @@
 
     connection.onclose = () => {
       done(true);
+    };
+
+    return {
+      close() {
+        connection.close();
+      }
     };
   }));
 })();

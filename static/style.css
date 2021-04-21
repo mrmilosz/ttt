@@ -23,6 +23,18 @@ button {
   font-family: inherit;
 }
 
+.controls {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.controls .control {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
 .input {
   font-size: 1rem;
   width: 100%;
@@ -37,6 +49,7 @@ button {
 .display {
   font-size: 1rem;
   margin-right: 1rem;
+  width: 3rem;
 }
 
 .docs {
@@ -45,6 +58,14 @@ button {
 
 .go {
   font-size: 1rem;
+}
+
+.dont {
+  font-size: 1rem;
+}
+
+.dont:not(.visible) {
+  display: none;
 }
 
 .output {
